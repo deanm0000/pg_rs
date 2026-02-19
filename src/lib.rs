@@ -54,7 +54,6 @@ impl SourceGenerator {
 
         let df = py.detach(|| -> PyResult<Option<PyDataFrame>> {
             rt.block_on(async move {
-                // let mut j = 0;
                 let (rows_ready, stream_is_done_val) = loop {
                     // check to see how many rows are ready
                     // we wait until there are rows equal to buffer size or the query is done.
@@ -201,9 +200,6 @@ struct Connection {
 }
 impl Drop for Connection {
     fn drop(&mut self) {
-        // if let Some(handle) = self.monitor_abort.take() {
-        //     handle.abort();
-        // }
         match &self.keep_alive {
             KeepAlive::No => {}
             KeepAlive::Yes(keeping_alive) => keeping_alive.monitor_abort.abort(),
@@ -246,7 +242,6 @@ impl Connection {
                     .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
                 match first_row {
                     Some(row) => {
-                        // Process the row...
                         let (schema, avs) = first_row_to_avs(row)
                             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
                         Ok::<FirstRowRes, PyErr>(FirstRowRes::Exists((schema, avs, rs_pin)))
@@ -268,8 +263,6 @@ impl Connection {
         let avs = Arc::new(Mutex::new(avs));
         let schema_arc = Arc::new(schema);
 
-        // 3. Re-acquire the GIL (automatically happens after allow_threads)
-        // Now create the Python-wrapped generator
         let avs_clone = avs.clone();
         let pause = Arc::new(AtomicBool::new(false));
         let pause_clone = pause.clone();
@@ -449,8 +442,6 @@ fn pg_rs(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
             .map_err(|e| PyRuntimeError::new_err(format!("TLS Init Error: {}", e)))?;
         Ok(res)
     }
-
-    // 2. Register the function and classes explicitly
     m.add_function(wrap_pyfunction!(connect, m)?)?;
     m.add_function(wrap_pyfunction!(async_connect, m)?)?;
     m.add_class::<Connection>()?;
@@ -484,9 +475,7 @@ impl KeepAlive {
 
                         match sleep_timer.await {
                             Ok(_) => {
-                                // We received a notification!
-                                // Meaning a query ran recently.
-                                // The loop restarts, resetting the 30s timer.
+                                // We received a notification, reset loop
                                 continue;
                             }
                             Err(_) => {
@@ -495,11 +484,10 @@ impl KeepAlive {
                                     break;
                                 }
                                 let active_stream = active_stream.load(Ordering::SeqCst);
+                                // can't query postgres while active stream is going
                                 if !active_stream {
-                                    // Send Ping
                                     let _ = client.simple_query("SELECT 1").await;
                                 }
-                                // Loop restarts
                             }
                         }
                     }

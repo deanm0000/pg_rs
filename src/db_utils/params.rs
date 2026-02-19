@@ -58,7 +58,7 @@ impl ToSql for QueryParam {
             QueryParam::Date(v) => v.to_sql(ty, out),
             QueryParam::DateTime(v) => match *ty {
                 Type::TIMESTAMP => v.to_sql(ty, out),
-                // If DB wants Timezone but we have Naive, assume UTC
+
                 Type::TIMESTAMPTZ => {
                     let dt_utc = &Utc.from_utc_datetime(v);
                     dt_utc.to_sql(ty, out)

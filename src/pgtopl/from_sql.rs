@@ -44,23 +44,15 @@ fn json_from_sql(
 fn datetime_i64_from_sql<'a>(
     raw: &'a [u8],
 ) -> Result<i64, Box<dyn std::error::Error + Sync + Send>> {
-    // Postgres TIMESTAMP is an 8-byte big-endian integer (microseconds)
     let bytes: [u8; 8] = raw.try_into()?;
     let pg_micros = i64::from_be_bytes(bytes);
 
     // Seconds between 1970-01-01 and 2000-01-01: 946,684,800
     const SECONDS_DIFF: i64 = 946_684_800;
     const MICROS_PER_SECOND: i64 = 1_000_000;
-    const NANOS_PER_MICRO: i64 = 1_000;
 
-    // Convert Postgres micros to Unix micros
     let unix_micros = pg_micros + (SECONDS_DIFF * MICROS_PER_SECOND);
 
-    // Convert Unix micros to Unix nanos
-    // Note: Check for overflow if your application handles extreme dates
-    // let unix_nanos = unix_micros
-    //     .checked_mul(NANOS_PER_MICRO)
-    //     .ok_or("Timestamp nanoseconds overflowed i64")?;
     Ok(unix_micros)
 }
 
@@ -124,10 +116,9 @@ impl<'a> FromSql<'a> for AVWrap<'static> {
             }
 
             _ => {
-                // Handle Enums
                 if let Kind::Enum(_) = ty.kind() {
                     // let catmap = CategoricalMapping::new(&vars.len());
-                    //TODO make this return actual Enum type
+                    // TODO make this return actual Enum type
                     let s = <&str as FromSql>::from_sql(ty, raw).map(ToString::to_string)?;
                     return Ok(AVWrap(AnyValue::StringOwned(s.into())));
                 }

@@ -23,7 +23,6 @@ pub fn json_to_py(py: Python, val: JsonValue) -> PyResult<Py<PyAny>> {
     match val {
         JsonValue::Null => Ok(py.None()),
 
-        // Use .into_py_any(py) for simple scalars
         JsonValue::Bool(b) => Ok(b.into_py_any(py)?),
 
         JsonValue::Number(n) => {
@@ -39,22 +38,18 @@ pub fn json_to_py(py: Python, val: JsonValue) -> PyResult<Py<PyAny>> {
         JsonValue::String(s) => Ok(s.into_py_any(py)?),
 
         JsonValue::Array(arr) => {
-            // PyO3 0.23: "empty_bound" -> "empty"
             let list = PyList::empty(py);
             for item in arr {
                 list.append(json_to_py(py, item)?)?;
             }
-            // Convert Bound<'py, PyList> -> Py<PyAny>
             Ok(list.into_any().unbind())
         }
 
         JsonValue::Object(map) => {
-            // PyO3 0.23: "new_bound" -> "new"
             let dict = PyDict::new(py);
             for (k, v) in map {
                 dict.set_item(k, json_to_py(py, v)?)?;
             }
-            // Convert Bound<'py, PyDict> -> Py<PyAny>
             Ok(dict.into_any().unbind())
         }
     }
@@ -77,7 +72,6 @@ pub fn py_to_json(obj: pyo3::Bound<'_, PyAny>) -> PyResult<JsonValue> {
     }
 
     if let Ok(f) = obj.extract::<f64>() {
-        // serde_json::Number::from_f64 returns Option (None if infinite/NaN)
         if let Some(n) = serde_json::Number::from_f64(f) {
             return Ok(JsonValue::Number(n));
         } else {
@@ -86,8 +80,6 @@ pub fn py_to_json(obj: pyo3::Bound<'_, PyAny>) -> PyResult<JsonValue> {
     }
 
     if let Ok(list) = obj.extract::<pyo3::Bound<'_, PySequence>>() {
-        // Distinguish strings/bytes from generic sequences if necessary,
-        // but PyString is caught above.
         let mut arr = Vec::new();
         for i in 0..list.len()? {
             let item = list.get_item(i)?;
@@ -99,7 +91,7 @@ pub fn py_to_json(obj: pyo3::Bound<'_, PyAny>) -> PyResult<JsonValue> {
     if let Ok(dict) = obj.extract::<pyo3::Bound<'_, PyDict>>() {
         let mut map = serde_json::Map::new();
         for (k, v) in dict {
-            let key = k.extract::<String>()?; // JSON keys must be strings
+            let key = k.extract::<String>()?;
             let val = py_to_json(v)?;
             map.insert(key, val);
         }
@@ -189,13 +181,11 @@ impl<'a> FromSql<'a> for PgEnum {
         _ty: &Type,
         raw: &'a [u8],
     ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        // Enums are sent as simple UTF-8 strings
         let s = std::str::from_utf8(raw)?;
         Ok(PgEnum(s.to_string()))
     }
 
     fn accepts(ty: &Type) -> bool {
-        // Crucial: We accept ANY type that Postgres declares as an Enum
         matches!(ty.kind(), Kind::Enum(_))
     }
 }
@@ -276,23 +266,17 @@ pub fn row_to_rust(row: &Row) -> Result<Vec<PgCell>, String> {
                 Err(e) => return Err(e.to_string()),
             },
             _ => {
-                // 1. Check if it is an Enum
                 if let Kind::Enum(_) = col.type_().kind() {
-                    // Use our custom PgEnum wrapper
                     match row.try_get::<_, Option<PgEnum>>(i) {
-                        Ok(Some(e)) => PgCell::String(e.0), // Extract inner string
+                        Ok(Some(e)) => PgCell::String(e.0),
                         Ok(None) => PgCell::Null,
                         Err(e) => return Err(format!("Enum Error: {}", e)),
                     }
-                }
-                // 2. Try generic String (Text, Unknowns)
-                else {
+                } else {
                     match row.try_get::<_, Option<String>>(i) {
                         Ok(Some(s)) => PgCell::String(s),
                         Ok(None) => PgCell::Null,
                         Err(_e) => {
-                            // 3. Last Resort: Return error string instead of crashing
-                            // This handles Arrays, Numeric, Money, etc. gracefully
                             let type_name = col.type_().name();
                             PgCell::String(format!("<UnmappedType:{}>", type_name))
                         }
@@ -318,7 +302,7 @@ pub fn rust_row_to_py(py: Python, row: Vec<PgCell>) -> PyResult<Vec<Py<PyAny>>> 
             PgCell::Date(v) => v.into_py_any(py)?,
             PgCell::DateTime(v) => v.into_py_any(py)?,
             PgCell::DateTimeTz(v) => v.into_py_any(py)?,
-            PgCell::Json(v) => json_to_py(py, v)?, // Reuse your existing helper
+            PgCell::Json(v) => json_to_py(py, v)?,
             PgCell::Uuid(v) => {
                 let uuid_mod = PyModule::import(py, "uuid")?;
                 uuid_mod
