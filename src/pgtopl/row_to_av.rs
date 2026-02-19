@@ -49,7 +49,6 @@ pub async fn next_row_to_avs(
                 avb.add(wrap.into());
             }
             None => {
-                dbg!(row, avs.len());
                 return Err("imbalanced columns and buffers".to_string());
             }
         }

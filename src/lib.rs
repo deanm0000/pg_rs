@@ -68,7 +68,6 @@ impl SourceGenerator {
                     }
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 };
-                dbg!(rows_ready);
                 if rows_ready == 0 && stream_is_done_val {
                     return Ok(None);
                 }
@@ -119,17 +118,11 @@ impl SourceGenerator {
                     .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
                 if let Some(atomic_limit) = n_rows.as_ref() {
-                    // 1. Get the current value (Atomic load)
                     let n_rows_val = atomic_limit.load(Ordering::Relaxed);
-                    dbg!(n_rows_val);
                     if df.height() > n_rows_val {
-                        // 2. We have more data than remaining limit, so slice it
                         df = df.slice(0, n_rows_val);
-
-                        // 3. Subtract the height we used (the whole remaining limit)
                         atomic_limit.store(0, Ordering::Relaxed);
                     } else {
-                        // 4. We are within the limit, subtract the height of this batch
                         atomic_limit.fetch_sub(df.height(), Ordering::Relaxed);
                     }
                     if atomic_limit.load(Ordering::SeqCst) <= 0 {
@@ -173,7 +166,6 @@ impl PreSourceGenerator {
         n_rows: Option<i32>,
         batch_size: Option<i32>,
     ) -> PyResult<SourceGenerator> {
-        dbg!(&with_columns, &n_rows, &batch_size);
         let mut s_with_columns: Option<Vec<String>> = None;
 
         if let Some(v) = with_columns {
