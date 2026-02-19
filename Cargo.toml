@@ -1,0 +1,60 @@
+[package]
+name = "pg_rs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "pg_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+tokio-postgres = { version = "0.7.16", features = [
+    "with-chrono-0_4",
+    "with-uuid-1",
+    "with-serde_json-1",
+] }
+postgres-types = { version = "0.2.12", features = [
+    "derive",
+    "with-uuid-1",
+    "with-serde_json-1",
+] }
+pyo3 = { version = "0.27", features = [
+    "extension-module",
+    "chrono"
+] }
+pyo3-async-runtimes = { version = "^0.27", features = ["tokio-runtime"] }
+tokio = { version = "1.49.0", features = ["full"] }
+postgres-native-tls = "0.5.2"
+native-tls = "0.2.16"
+chrono = "0.4.41"
+bytes = "1.11.1"
+uuid = { version = "1.21.0", features = ["v4", "serde"] }
+serde_json = "1.0.149"
+polars = { version = "0.53.0", features = ["lazy",     "dtype-i8",
+    "dtype-i16",
+    "dtype-u8",
+    "dtype-u16",
+    "dtype-struct",
+    "dtype-date",
+    "dtype-datetime",
+    "dtype-duration",
+    "dtype-categorical",
+    "dtype-time",
+    "dtype-decimal","dtype-array","object"] }
+pyo3-polars = {version="0.26.0", features=["lazy"]}
+polars-core = { version = "0.53.0", default-features = false, features = [
+    "dtype-i8",
+    "dtype-i16",
+    "dtype-u8",
+    "dtype-u16",
+    "dtype-struct",
+    "dtype-date",
+    "dtype-datetime",
+    "dtype-duration",
+    "dtype-categorical",
+    "dtype-time",
+    "dtype-decimal","dtype-array","object"
+] }
+futures = "0.3.32"
+postgres-protocol = "0.6.10"
+
